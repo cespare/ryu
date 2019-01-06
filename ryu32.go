@@ -17,10 +17,9 @@
 
 package ryu
 
-const (
-	mantBits32 = 23
-	expBits32  = 8
-	bias32     = 127
+import (
+	"math"
+	"math/bits"
 )
 
 // dec32 is a floating decimal type representing m * 10^e.
@@ -79,8 +78,8 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 	var e2 int32
 	var m2 uint32
 	if exp == 0 {
-		// We subtract 2 so that the bounds computation has 2
-		// additional bits.
+		// We subtract 2 so that the bounds computation has
+		// 2 additional bits.
 		e2 = 1 - bias32 - mantBits32 - 2
 		m2 = mant
 	} else {
@@ -110,7 +109,7 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 	if e2 >= 0 {
 		q := log10Pow2(e2)
 		e10 = int32(q)
-		k := pow5InvNumBits + pow5Bits(int32(q)) - 1
+		k := pow5InvNumBits32 + pow5Bits(int32(q)) - 1
 		i := -e2 + int32(q) + k
 		vr = mulPow5InvDivPow2(mv, q, i)
 		vp = mulPow5InvDivPow2(mp, q, i)
@@ -121,7 +120,7 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 			// except that would require 33 bits for the result, and
 			// we've found that 32-bit arithmetic is faster even on
 			// 64-bit machines.
-			l := pow5InvNumBits + pow5Bits(int32(q-1)) - 1
+			l := pow5InvNumBits32 + pow5Bits(int32(q-1)) - 1
 			lastRemovedDigit = uint8(mulPow5InvDivPow2(mv, q-1, -e2+int32(q-1)+l) % 10)
 		}
 		if q <= 9 {
@@ -130,11 +129,11 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 			// mv, and mm can be a multiple of 5, if any.
 			switch {
 			case mv%5 == 0:
-				vrIsTrailingZeros = multipleOfPowerOf5(mv, q)
+				vrIsTrailingZeros = multipleOfPowerOfFive32(mv, q)
 			case acceptBounds:
-				vmIsTrailingZeros = multipleOfPowerOf5(mm, q)
+				vmIsTrailingZeros = multipleOfPowerOfFive32(mm, q)
 			default:
-				if multipleOfPowerOf5(mp, q) {
+				if multipleOfPowerOfFive32(mp, q) {
 					vp--
 				}
 			}
@@ -143,13 +142,13 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 		q := log10Pow5(-e2)
 		e10 = int32(q) + e2
 		i := -e2 - int32(q)
-		k := pow5Bits(i) - pow5NumBits
+		k := pow5Bits(i) - pow5NumBits32
 		j := int32(q) - k
 		vr = mulPow5DivPow2(mv, uint32(i), j)
 		vp = mulPow5DivPow2(mp, uint32(i), j)
 		vm = mulPow5DivPow2(mm, uint32(i), j)
 		if q != 0 && (vp-1)/10 <= vm/10 {
-			j = int32(q) - 1 - (pow5Bits(i+1) - pow5NumBits)
+			j = int32(q) - 1 - (pow5Bits(i+1) - pow5NumBits32)
 			lastRemovedDigit = uint8(mulPow5DivPow2(mv, uint32(i+1), j) % 10)
 		}
 		if q <= 1 {
@@ -167,7 +166,7 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 				vp--
 			}
 		} else if q < 31 {
-			vrIsTrailingZeros = multipleOfPowerOf2(mv, q-1)
+			vrIsTrailingZeros = multipleOfPowerOfTwo32(mv, q-1)
 		}
 	}
 
@@ -217,13 +216,82 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 			vm /= 10
 			removed++
 		}
+		out = vr
 		// We need to take vr + 1 if vr is outside bounds
 		// or we need to round up.
-		out = vr
 		if vr == vm || lastRemovedDigit >= 5 {
 			out++
 		}
 	}
 
 	return dec32{m: out, e: e10 + removed}
+}
+
+func decimalLen32(u uint32) int {
+	// Function precondition: u is not a 10-digit number.
+	// (9 digits are sufficient for round-tripping.)
+	assert(u < 1000000000, "too big")
+	switch {
+	case u >= 100000000:
+		return 9
+	case u >= 10000000:
+		return 8
+	case u >= 1000000:
+		return 7
+	case u >= 100000:
+		return 6
+	case u >= 10000:
+		return 5
+	case u >= 1000:
+		return 4
+	case u >= 100:
+		return 3
+	case u >= 10:
+		return 2
+	default:
+		return 1
+	}
+}
+
+func mulShift32(m uint32, mul uint64, shift int32) uint32 {
+	assert(shift > 32, "shift > 32")
+
+	// FIXME: Test against just using 64-bit multiplication.
+	mulLo := uint32(mul)
+	mulHi := uint32(mul >> 32)
+	bits0 := uint64(m) * uint64(mulLo)
+	bits1 := uint64(m) * uint64(mulHi)
+
+	sum := (bits0 >> 32) + bits1
+	shiftedSum := sum >> uint(shift-32)
+	assert(shiftedSum <= math.MaxUint32, "shiftedSum <= math.MaxUint32")
+	return uint32(shiftedSum)
+}
+
+func mulPow5InvDivPow2(m, q uint32, j int32) uint32 {
+	return mulShift32(m, pow5InvSplit32[q], j)
+}
+
+func mulPow5DivPow2(m, i uint32, j int32) uint32 {
+	return mulShift32(m, pow5Split32[i], j)
+}
+
+func pow5Factor32(v uint32) uint32 {
+	for n := uint32(0); ; n++ {
+		q, r := v/5, v%5
+		if r != 0 {
+			return n
+		}
+		v = q
+	}
+}
+
+// multipleOfPowerOfFive32 reports whether v is divisible by 5^p.
+func multipleOfPowerOfFive32(v, p uint32) bool {
+	return pow5Factor32(v) >= p
+}
+
+// multipleOfPowerOfTwo32 reports whether v is divisible by 2^p.
+func multipleOfPowerOfTwo32(v, p uint32) bool {
+	return uint32(bits.TrailingZeros32(v)) >= p
 }

@@ -17,6 +17,7 @@
 // Ulf Adams which may be found at
 //
 //     https://github.com/ulfjack/ryu/analysis/PrintFloatLookupTable.java
+//     https://github.com/ulfjack/ryu/analysis/PrintDoubleLookupTable.java
 //
 // That source code is licensed under Apache 2.0 and this code is derivative
 // work thereof.
@@ -60,21 +61,26 @@ package ryu
 `)
 
 const (
-	posTableSize   = 47
-	invTableSize   = 31
-	pow5NumBits    = 61 // max 63
-	pow5InvNumBits = 59 // max 63
+	posTableSize32   = 47
+	negTableSize32   = 31
+	pow5NumBits32    = 61 // max 63
+	pow5InvNumBits32 = 59 // max 63
+
+	posTableSize64   = 326
+	negTableSize64   = 291 + 1
+	pow5NumBits64    = 121 // max 127
+	pow5InvNumBits64 = 122 // max 127
 )
 
 func main() {
 	b := bytes.NewBuffer(header)
 
-	fmt.Fprintf(b, "const pow5NumBits = %d\n", pow5NumBits)
-	fmt.Fprintln(b, "var pow5Split = [...]uint64{")
-	for i := 0; i < posTableSize; i++ {
+	fmt.Fprintf(b, "const pow5NumBits32 = %d\n", pow5NumBits32)
+	fmt.Fprintln(b, "var pow5Split32 = [...]uint64{")
+	for i := int64(0); i < posTableSize32; i++ {
 		pow5 := big.NewInt(5)
-		pow5.Exp(pow5, big.NewInt(int64(i)), nil)
-		shift := pow5.BitLen() - pow5NumBits
+		pow5.Exp(pow5, big.NewInt(i), nil)
+		shift := pow5.BitLen() - pow5NumBits32
 		rsh(pow5, shift)
 		fmt.Fprintf(b, "%d,", pow5.Uint64())
 		if i%4 == 3 {
@@ -83,20 +89,54 @@ func main() {
 	}
 	fmt.Fprintln(b, "\n}")
 
-	fmt.Fprintf(b, "const pow5InvNumBits = %d\n", pow5InvNumBits)
-	fmt.Fprintln(b, "var pow5InvSplit = [...]uint64{")
-	for i := 0; i < invTableSize; i++ {
+	fmt.Fprintf(b, "const pow5InvNumBits32 = %d\n", pow5InvNumBits32)
+	fmt.Fprintln(b, "var pow5InvSplit32 = [...]uint64{")
+	for i := int64(0); i < negTableSize32; i++ {
 		pow5 := big.NewInt(5)
-		pow5.Exp(pow5, big.NewInt(int64(i)), nil)
-		shift := pow5.BitLen() - 1 + pow5InvNumBits
-		pow5Inv := big.NewInt(1)
-		rsh(pow5Inv, -shift)
-		pow5Inv.Quo(pow5Inv, pow5)
-		pow5Inv.Add(pow5Inv, big.NewInt(1))
-		fmt.Fprintf(b, "%d,", pow5Inv.Uint64())
+		pow5.Exp(pow5, big.NewInt(i), nil)
+		shift := pow5.BitLen() - 1 + pow5InvNumBits32
+		inv := big.NewInt(1)
+		rsh(inv, -shift)
+		inv.Quo(inv, pow5)
+		inv.Add(inv, big.NewInt(1))
+		fmt.Fprintf(b, "%d,", inv.Uint64())
 		if i%4 == 3 {
 			fmt.Fprintln(b)
 		}
+	}
+	fmt.Fprintln(b, "\n}")
+
+	mask64 := big.NewInt(1)
+	mask64.Lsh(mask64, 64)
+	mask64.Sub(mask64, big.NewInt(1))
+
+	fmt.Fprintf(b, "const pow5NumBits64 = %d\n", pow5NumBits64)
+	fmt.Fprintln(b, "var pow5Split64 = [...]uint128{")
+	for i := int64(0); i < posTableSize64; i++ {
+		pow5 := big.NewInt(5)
+		pow5.Exp(pow5, big.NewInt(i), nil)
+		shift := pow5.BitLen() - pow5NumBits64
+		rsh(pow5, shift)
+		lo := new(big.Int).And(pow5, mask64)
+		hi := new(big.Int).Rsh(pow5, 64)
+		fmt.Fprintf(b, "{%d, %d},\n", lo.Uint64(), hi.Uint64())
+	}
+	fmt.Fprintln(b, "\n}")
+
+	fmt.Fprintf(b, "const pow5InvNumBits64 = %d\n", pow5InvNumBits64)
+	fmt.Fprintln(b, "var pow5InvSplit64 = [...]uint128{")
+	for i := int64(0); i < negTableSize64; i++ {
+		pow5 := big.NewInt(5)
+		pow5.Exp(pow5, big.NewInt(i), nil)
+		// We want floor(log_2 5^q) here, which is pow5.BitLen() - 1.
+		shift := pow5.BitLen() - 1 + pow5InvNumBits64
+		inv := big.NewInt(1)
+		rsh(inv, -shift)
+		inv.Quo(inv, pow5)
+		inv.Add(inv, big.NewInt(1))
+		lo := new(big.Int).And(inv, mask64)
+		hi := new(big.Int).Rsh(inv, 64)
+		fmt.Fprintf(b, "{%d, %d},\n", lo.Uint64(), hi.Uint64())
 	}
 	fmt.Fprintln(b, "\n}")
 
