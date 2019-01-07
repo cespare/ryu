@@ -186,22 +186,38 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 	// On average, we remove ~2 digits.
 	if vmIsTrailingZeros || vrIsTrailingZeros {
 		// General case, which happens rarely (~0.7%).
-		for vp/10 > vm/10 {
-			vmIsTrailingZeros = vmIsTrailingZeros && vm%10 == 0
+		for {
+			vpDiv10 := vp / 10
+			vmDiv10 := vm / 10
+			if vpDiv10 <= vmDiv10 {
+				break
+			}
+			vmMod10 := vm % 10
+			vrDiv10 := vr / 10
+			vrMod10 := vr % 10
+			vmIsTrailingZeros = vmIsTrailingZeros && vmMod10 == 0
 			vrIsTrailingZeros = vrIsTrailingZeros && lastRemovedDigit == 0
-			lastRemovedDigit = uint8(vr % 10)
-			vr /= 10
-			vp /= 10
-			vm /= 10
+			lastRemovedDigit = uint8(vrMod10)
+			vr = vrDiv10
+			vp = vpDiv10
+			vm = vmDiv10
 			removed++
 		}
 		if vmIsTrailingZeros {
-			for vm%10 == 0 {
+			for {
+				vmDiv10 := vm / 10
+				vmMod10 := vm % 10
+				if vmMod10 != 0 {
+					break
+				}
+				vpDiv10 := vp / 10
+				vrDiv10 := vr / 10
+				vrMod10 := vr % 10
 				vrIsTrailingZeros = vrIsTrailingZeros && lastRemovedDigit == 0
-				lastRemovedDigit = uint8(vr % 10)
-				vr /= 10
-				vp /= 10
-				vm /= 10
+				lastRemovedDigit = uint8(vrMod10)
+				vr = vrDiv10
+				vp = vpDiv10
+				vm = vmDiv10
 				removed++
 			}
 		}

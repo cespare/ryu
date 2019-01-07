@@ -66,6 +66,50 @@ func TestFormatFloat64(t *testing.T) {
 	}
 }
 
+var sink string
+var sinkb []byte
+
+// Much of the Format cost is allocation, so most of the interesting benchmarks
+// are for Append, below.
+
+const benchFloat = 123.456
+
+func BenchmarkFormatFloat32(b *testing.B) {
+	var s string
+	f := float32(benchFloat)
+	for i := 0; i < b.N; i++ {
+		s = FormatFloat32(f)
+	}
+	sink = s
+}
+
+func BenchmarkStrconvFormatFloat32(b *testing.B) {
+	var s string
+	f := float32(benchFloat)
+	for i := 0; i < b.N; i++ {
+		s = strconv.FormatFloat(float64(f), 'e', -1, 32)
+	}
+	sink = s
+}
+
+func BenchmarkFormatFloat64(b *testing.B) {
+	var s string
+	f := float64(benchFloat)
+	for i := 0; i < b.N; i++ {
+		s = FormatFloat64(f)
+	}
+	sink = s
+}
+
+func BenchmarkStrconvFormatFloat64(b *testing.B) {
+	var s string
+	f := float64(benchFloat)
+	for i := 0; i < b.N; i++ {
+		s = strconv.FormatFloat(f, 'e', -1, 64)
+	}
+	sink = s
+}
+
 var benchCases = []float64{
 	0,
 	1,
@@ -74,58 +118,56 @@ var benchCases = []float64{
 	-123.45,
 }
 
-var sink string
-
-func BenchmarkFormatFloat32(b *testing.B) {
+func BenchmarkAppendFloat32(b *testing.B) {
 	for _, f64 := range benchCases {
 		f := float32(f64)
 		b.Run(FormatFloat32(f), func(b *testing.B) {
-			var s string
+			var buf []byte
 			for i := 0; i < b.N; i++ {
-				s = FormatFloat32(f)
+				buf = AppendFloat32(buf[:0], f)
 			}
-			sink = s
+			sinkb = buf
 		})
 	}
 }
 
-func BenchmarkStrconvFormatFloat32(b *testing.B) {
+func BenchmarkStrconvAppendFloat32(b *testing.B) {
 	for _, f64 := range benchCases {
 		f := float32(f64)
 		b.Run(FormatFloat32(f), func(b *testing.B) {
-			var s string
+			var buf []byte
 			for i := 0; i < b.N; i++ {
-				s = strconv.FormatFloat(float64(f), 'e', -1, 32)
+				buf = strconv.AppendFloat(buf[:0], float64(f), 'e', -1, 32)
 			}
-			sink = s
+			sinkb = buf
 		})
 	}
 }
 
 var benchCases64 = []float64{
-	622666234635.3213e-320,
+	622666234635.3213e-320, // https://golang.org/issue/15672
 }
 
-func BenchmarkFormatFloat64(b *testing.B) {
+func BenchmarkAppendFloat64(b *testing.B) {
 	for _, f := range append(benchCases, benchCases64...) {
 		b.Run(FormatFloat64(f), func(b *testing.B) {
-			var s string
+			var buf []byte
 			for i := 0; i < b.N; i++ {
-				s = FormatFloat64(f)
+				buf = AppendFloat64(buf[:0], f)
 			}
-			sink = s
+			sinkb = buf
 		})
 	}
 }
 
-func BenchmarkStrconvFormatFloat64(b *testing.B) {
+func BenchmarkStrconvAppendFloat64(b *testing.B) {
 	for _, f := range append(benchCases, benchCases64...) {
 		b.Run(FormatFloat64(f), func(b *testing.B) {
-			var s string
+			var buf []byte
 			for i := 0; i < b.N; i++ {
-				s = strconv.FormatFloat(float64(f), 'e', -1, 64)
+				buf = strconv.AppendFloat(buf[:0], f, 'e', -1, 64)
 			}
-			sink = s
+			sinkb = buf
 		})
 	}
 }
