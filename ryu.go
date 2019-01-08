@@ -68,6 +68,8 @@ func AppendFloat32(b []byte, f float32) []byte {
 		return appendSpecial(b, neg, exp == 0, mant == 0)
 	}
 
+	// FIXME: add "exact int" optimization.
+
 	d := float32ToDecimal(mant, exp)
 	return d.append(b, neg)
 }
@@ -101,7 +103,10 @@ func AppendFloat64(b []byte, f float64) []byte {
 		return appendSpecial(b, neg, exp == 0, mant == 0)
 	}
 
-	d := float64ToDecimal(mant, exp)
+	d, ok := float64ToDecimalExactInt(mant, exp)
+	if !ok {
+		d = float64ToDecimal(mant, exp)
+	}
 	return d.append(b, neg)
 }
 

@@ -17,7 +17,9 @@
 
 package ryu
 
-import "math/bits"
+import (
+	"math/bits"
+)
 
 type uint128 struct {
 	lo uint64
@@ -46,7 +48,12 @@ func (d dec64) append(b []byte, neg bool) []byte {
 	// Print the decimal digits.
 	// FIXME: optimize.
 	n := len(b)
-	b = append(b, make([]byte, bufLen)...)
+	if cap(b)-len(b) >= bufLen {
+		// Avoid function call in the common case.
+		b = b[:len(b)+bufLen]
+	} else {
+		b = append(b, make([]byte, bufLen)...)
+	}
 	for i := 0; i < outLen-1; i++ {
 		b[n+outLen-i] = '0' + byte(out%10)
 		out /= 10
@@ -81,6 +88,25 @@ func (d dec64) append(b []byte, neg bool) []byte {
 	return b
 }
 
+func float64ToDecimalExactInt(mant, exp uint64) (d dec64, ok bool) {
+	e := exp - bias64
+	if e > mantBits64 {
+		return d, false
+	}
+	shift := mantBits64 - e
+	mant |= 1 << mantBits64 // implicit 1
+	d.m = mant >> shift
+	if d.m<<shift != mant {
+		return d, false
+	}
+
+	for d.m%10 == 0 {
+		d.m /= 10
+		d.e++
+	}
+	return d, true
+}
+
 func float64ToDecimal(mant, exp uint64) dec64 {
 	var e2 int32
 	var m2 uint64
@@ -102,6 +128,9 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 	if mant != 0 || exp <= 1 {
 		mmShift = 1
 	}
+	// We would compute mp and mm like this:
+	// mp := 4 * m2 + 2;
+	// mm := mv - 1 - mmShift;
 
 	// Step 3: Convert to a decimal power base uing 128-bit arithmetic.
 	var (
