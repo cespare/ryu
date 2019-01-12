@@ -19,6 +19,7 @@ package ryu
 
 import (
 	"math"
+	"math/rand"
 	"strconv"
 	"testing"
 )
@@ -36,11 +37,24 @@ var genericTestCases = []float64{
 	0.3,
 	-0.3,
 	1000000,
+	123456.7,
 	123e45,
 	-123.45,
+	1e23,
 	math.SmallestNonzeroFloat32,
 	math.MaxFloat32,
+	below1e23,
+	above1e23,
+
+	// https://golang.org/issue/2625
+	383260575764816448,
+	383260575764816448,
 }
+
+const (
+	below1e23 = 99999999999999974834176
+	above1e23 = 100000000000000008388608
+)
 
 func TestFormatFloat32(t *testing.T) {
 	for _, f64 := range genericTestCases {
@@ -55,9 +69,16 @@ func TestFormatFloat32(t *testing.T) {
 
 var float64TestCases = []float64{
 	123e300,
-	123e-456,
+	123e-300,
+	5e-324,
+	-5e-324,
 	math.SmallestNonzeroFloat64,
 	math.MaxFloat64,
+
+	// https://www.exploringbinary.com/java-hangs-when-converting-2-2250738585072012e-308/
+	2.2250738585072012e-308,
+	// https://www.exploringbinary.com/php-hangs-on-numeric-value-2-2250738585072011e-308/
+	2.2250738585072011e-308,
 }
 
 func TestFormatFloat64(t *testing.T) {
@@ -66,6 +87,24 @@ func TestFormatFloat64(t *testing.T) {
 		want := strconv.FormatFloat(f, 'e', -1, 64)
 		if got != want {
 			t.Errorf("FormatFloat64(%g): got %q; want %q", f, got, want)
+		}
+	}
+}
+
+func TestFormatFloat64Random(t *testing.T) {
+	for i := 0; i < 1e6; i++ {
+		f := math.Float64frombits(rand.Uint64())
+
+		got32 := FormatFloat32(float32(f))
+		want32 := strconv.FormatFloat(f, 'e', -1, 32)
+		if got32 != want32 {
+			t.Fatalf("FormatFloat32(%g): got %q; want %q", f, got32, want32)
+		}
+
+		got := FormatFloat64(f)
+		want := strconv.FormatFloat(f, 'e', -1, 64)
+		if got != want {
+			t.Fatalf("FormatFloat64(%g): got %q; want %q", f, got, want)
 		}
 	}
 }
