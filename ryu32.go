@@ -249,14 +249,8 @@ func decimalLen32(u uint32) int {
 func mulShift32(m uint32, mul uint64, shift int32) uint32 {
 	assert(shift > 32, "shift > 32")
 
-	// FIXME: Test against just using 64-bit multiplication.
-	mulLo := uint32(mul)
-	mulHi := uint32(mul >> 32)
-	bits0 := uint64(m) * uint64(mulLo)
-	bits1 := uint64(m) * uint64(mulHi)
-
-	sum := (bits0 >> 32) + bits1
-	shiftedSum := sum >> uint(shift-32)
+	hi, lo := bits.Mul64(uint64(m), mul)
+	shiftedSum := (lo >> uint(shift)) + (hi << uint(64-shift))
 	assert(shiftedSum <= math.MaxUint32, "shiftedSum <= math.MaxUint32")
 	return uint32(shiftedSum)
 }
