@@ -90,13 +90,12 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 	acceptBounds := even
 
 	// Step 2: Determine the interval of valid decimal representations.
-	mv := 4 * m2
-	mp := 4*m2 + 2
-	var mmShift uint32
-	if mant != 0 || exp <= 1 {
-		mmShift = 1
-	}
-	mm := 4*m2 - 1 - mmShift
+	var (
+		mv      = 4 * m2
+		mp      = 4*m2 + 2
+		mmShift = boolToUint32(mant != 0 || exp <= 1)
+		mm      = 4*m2 - 1 - mmShift
+	)
 
 	// Step 3: Convert to a decimal power base using 64-bit arithmetic.
 	var (
@@ -127,15 +126,12 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 			// The largest power of 5 that fits in 24 bits is 5^10,
 			// but q <= 9 seems to be safe as well. Only one of mp,
 			// mv, and mm can be a multiple of 5, if any.
-			switch {
-			case mv%5 == 0:
+			if mv%5 == 0 {
 				vrIsTrailingZeros = multipleOfPowerOfFive32(mv, q)
-			case acceptBounds:
+			} else if acceptBounds {
 				vmIsTrailingZeros = multipleOfPowerOfFive32(mm, q)
-			default:
-				if multipleOfPowerOfFive32(mp, q) {
-					vp--
-				}
+			} else if multipleOfPowerOfFive32(mp, q) {
+				vp--
 			}
 		}
 	} else {
@@ -216,12 +212,9 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 			vm /= 10
 			removed++
 		}
-		out = vr
 		// We need to take vr + 1 if vr is outside bounds
 		// or we need to round up.
-		if vr == vm || lastRemovedDigit >= 5 {
-			out++
-		}
+		out = vr + boolToUint32(vr == vm || lastRemovedDigit >= 5)
 	}
 
 	return dec32{m: out, e: e10 + removed}

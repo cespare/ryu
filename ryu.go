@@ -27,7 +27,6 @@ import (
 
 // FIXME Optimizations:
 // bits.Div
-// boolToUint32
 
 const (
 	mantBits32 = 23
@@ -159,4 +158,20 @@ func pow5Bits(e int32) int32 {
 	assert(e >= 0, "e >= 0")
 	assert(e <= 3528, "e <= 3528")
 	return int32((uint32(e)*1217359)>>19 + 1)
+}
+
+// FIXME(caleb): Document how these are optimized.
+
+func boolToUint32(b bool) uint32 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func boolToUint64(b bool) uint64 {
+	if b {
+		return 1
+	}
+	return 0
 }

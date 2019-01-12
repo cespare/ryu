@@ -124,10 +124,7 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 
 	// Step 2: Determine the interval of valid decimal representations.
 	mv := 4 * m2
-	var mmShift uint64
-	if mant != 0 || exp <= 1 {
-		mmShift = 1
-	}
+	mmShift := boolToUint64(mant != 0 || exp <= 1)
 	// We would compute mp and mm like this:
 	// mp := 4 * m2 + 2;
 	// mm := mv - 1 - mmShift;
@@ -142,10 +139,7 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 	if e2 >= 0 {
 		// This expression is slightly faster than max(0, log10Pow2(e2) - 1).
 		// FIXME: Confirm.
-		q := log10Pow2(e2)
-		if e2 > 3 {
-			q--
-		}
+		q := log10Pow2(e2) - boolToUint32(e2 > 3)
 		e10 = int32(q)
 		k := pow5InvNumBits64 + pow5Bits(int32(q)) - 1
 		i := -e2 + int32(q) + k
@@ -165,19 +159,14 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 				// <=> e2 + (^mm & 1) >= q && pow5Factor64(mm) >= q
 				// <=> true && pow5Factor64(mm) >= q, since e2 >= q.
 				vmIsTrailingZeros = multipleOfPowerOfFive64(mv-1-mmShift, q)
-			} else {
-				if multipleOfPowerOfFive64(mv+2, q) {
-					vp--
-				}
+			} else if multipleOfPowerOfFive64(mv+2, q) {
+				vp--
 			}
 		}
 	} else {
 		// This expression is slightly faster than max(0, log10Pow5(-e2) - 1).
 		// FIXME: confirm
-		q := log10Pow5(-e2)
-		if -e2 > 1 {
-			q--
-		}
+		q := log10Pow5(-e2) - boolToUint32(-e2 > 1)
 		e10 = int32(q) + e2
 		i := -e2 - int32(q)
 		k := pow5Bits(i) - pow5NumBits64
@@ -283,12 +272,9 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 			vm /= 10
 			removed++
 		}
-		out = vr
 		// We need to take vr + 1 if vr is outside bounds
 		// or we need to round up.
-		if vr == vm || roundUp {
-			out++
-		}
+		out = vr + boolToUint64(vr == vm || roundUp)
 	}
 
 	return dec64{m: out, e: e10 + removed}
