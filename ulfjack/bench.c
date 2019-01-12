@@ -12,6 +12,9 @@ int64_t time_sub(const struct timespec *t0, const struct timespec *t1) {
 }
 
 int main(int argc, char **argv) {
+  printf("%s\n", f2s((float)(6.400023450830159e+08)));
+  return 0;
+
   struct timespec start, end;
   int64_t elapsed;
   int64_t iters = 0;
