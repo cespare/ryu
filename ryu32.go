@@ -74,6 +74,24 @@ func (d dec32) append(b []byte, neg bool) []byte {
 	return b
 }
 
+func float32ToDecimalExactInt(mant, exp uint32) (d dec32, ok bool) {
+	e := exp - bias32
+	if e > mantBits32 {
+		return d, false
+	}
+	shift := mantBits32 - e
+	mant |= 1 << mantBits32 // implicit 1
+	d.m = mant >> shift
+	if d.m<<shift != mant {
+		return d, false
+	}
+	for d.m%10 == 0 {
+		d.m /= 10
+		d.e++
+	}
+	return d, true
+}
+
 func float32ToDecimal(mant, exp uint32) dec32 {
 	var e2 int32
 	var m2 uint32
