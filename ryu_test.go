@@ -91,7 +91,8 @@ func TestFormatFloat64(t *testing.T) {
 	}
 }
 
-func TestFormatFloat64Random(t *testing.T) {
+func TestFormatFloatRandom(t *testing.T) {
+	t.Skip("disabled because of Go bug: https://github.com/golang/go/issues/29491")
 	for i := 0; i < 1e6; i++ {
 		f := math.Float64frombits(rand.Uint64())
 
