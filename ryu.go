@@ -161,6 +161,11 @@ func pow5Bits(e int32) int32 {
 	return int32((uint32(e)*1217359)>>19 + 1)
 }
 
+func copyTwoDigits(b []byte, d uint) {
+	b[0] = twoDigits[d]
+	b[1] = twoDigits[d+1]
+}
+
 // FIXME(caleb): Document how these are optimized.
 
 func boolToUint32(b bool) uint32 {

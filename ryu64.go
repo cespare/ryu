@@ -46,7 +46,6 @@ func (d dec64) append(b []byte, neg bool) []byte {
 	}
 
 	// Print the decimal digits.
-	// FIXME: optimize.
 	n := len(b)
 	if cap(b)-len(b) >= bufLen {
 		// Avoid function call in the common case.
@@ -54,11 +53,59 @@ func (d dec64) append(b []byte, neg bool) []byte {
 	} else {
 		b = append(b, make([]byte, bufLen)...)
 	}
-	for i := 0; i < outLen-1; i++ {
-		b[n+outLen-i] = '0' + byte(out%10)
-		out /= 10
+	// The code below is equivalent to the following:
+	// for i := 0; i < outLen-1; i++ {
+	// 	b[n+outLen-i] = '0' + byte(out%10)
+	// 	out /= 10
+	// }
+	// b[n] = '0' + byte(out%10)
+
+	// We prefer 32-bit divisions even on 64-bit platforms.
+	// We have at most 17 digits, and uint32 can store 9 digits.
+	// If the output doesn't fit into a uint32, cut off 8 digits
+	// so the rest will fit into a uint32.
+	var i int
+	if out>>32 > 0 {
+		// FIXME: bits.Div?
+		q, r := out/1e8, out%1e8
+		out = q
+
+		c := r % 1e4
+		r /= 1e4
+		d := r % 1e4
+		c0 := uint(c%100) << 1
+		c1 := uint(c/100) << 1
+		d0 := uint(d%100) << 1
+		d1 := uint(d/100) << 1
+		copyTwoDigits(b[n+outLen-i-7:], d1)
+		copyTwoDigits(b[n+outLen-i-5:], d0)
+		copyTwoDigits(b[n+outLen-i-3:], c1)
+		copyTwoDigits(b[n+outLen-i-1:], c0)
+		i += 8
 	}
-	b[n] = '0' + byte(out%10)
+	out32 := uint32(out)
+	for ; out32 >= 1e4; i += 4 {
+		c := out32 % 1e4
+		out32 /= 1e4
+		c0 := uint(c%100) << 1
+		c1 := uint(c/100) << 1
+		copyTwoDigits(b[n+outLen-i-1:], c0)
+		copyTwoDigits(b[n+outLen-i-3:], c1)
+	}
+	if out32 >= 100 {
+		c := uint(out32%100) << 1
+		out32 /= 100
+		copyTwoDigits(b[n+outLen-i-1:], c)
+		i += 2
+	}
+	if out32 >= 10 {
+		c := out32 << 1
+		// The dot goes between the digits.
+		b[n+outLen-i] = twoDigits[c+1]
+		b[n] = twoDigits[c]
+	} else {
+		b[n] = '0' + byte(out32)
+	}
 
 	// Print the '.' if needed.
 	if outLen > 1 {

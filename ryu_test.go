@@ -79,6 +79,10 @@ var float64TestCases = []float64{
 	2.2250738585072012e-308,
 	// https://www.exploringbinary.com/php-hangs-on-numeric-value-2-2250738585072011e-308/
 	2.2250738585072011e-308,
+
+	// https://github.com/golang/go/issues/29491
+	//498484681984085570,
+	//-5.8339553793802237e+23,
 }
 
 func TestFormatFloat64(t *testing.T) {

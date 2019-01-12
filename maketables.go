@@ -75,6 +75,15 @@ const (
 func main() {
 	b := bytes.NewBuffer(header)
 
+	fmt.Fprintln(b, "var twoDigits = [200]byte{")
+	for i := 0; i < 10; i++ {
+		for j := 0; j < 10; j++ {
+			fmt.Fprintf(b, "'%c','%c',", '0'+i, '0'+j)
+		}
+		fmt.Fprintln(b)
+	}
+	fmt.Fprintln(b, "\n}")
+
 	fmt.Fprintf(b, "const pow5NumBits32 = %d\n", pow5NumBits32)
 	fmt.Fprintln(b, "var pow5Split32 = [...]uint64{")
 	for i := int64(0); i < posTableSize32; i++ {
