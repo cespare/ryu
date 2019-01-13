@@ -66,11 +66,24 @@ const (
 	pow5NumBits32    = 61 // max 63
 	pow5InvNumBits32 = 59 // max 63
 
-	posTableSize64   = 326
-	negTableSize64   = 291 + 1
+	posTableSize64   = 13
+	negTableSize64   = 13
 	pow5NumBits64    = 121 // max 127
 	pow5InvNumBits64 = 122 // max 127
 )
+
+var pow5Offsets = []uint32{
+	0x00000000, 0x00000000, 0x00000000, 0x033c55be, 0x03db77d8, 0x0265ffb2,
+	0x00000800, 0x01a8ff56, 0x00000000, 0x0037a200, 0x00004000, 0x03fffffc,
+	0x00003ffe,
+}
+
+var pow5InvOffsets = []uint32{
+	0x51505404, 0x55054514, 0x45555545, 0x05511411, 0x00505010, 0x00000004,
+	0x00000000, 0x00000000, 0x55555040, 0x00505051, 0x00050040, 0x55554000,
+	0x51659559, 0x00001000, 0x15000010, 0x55455555, 0x41404051, 0x00001010,
+	0x00000014, 0x00000000,
+}
 
 func main() {
 	b := bytes.NewBuffer(header)
@@ -104,6 +117,16 @@ func main() {
 			fmt.Fprintln(b)
 		}
 	}
+	fmt.Fprintln(b, "\n}\n")
+
+	// For the float64 tables, only store every 26th entry.
+
+	fmt.Fprintln(b, "var pow5Table = [...]uint64{")
+	for i := int64(0); i < 26; i++ {
+		pow5 := big.NewInt(5)
+		pow5.Exp(pow5, big.NewInt(i), nil)
+		fmt.Fprintf(b, "%d,\n", pow5.Uint64())
+	}
 	fmt.Fprintln(b, "\n}")
 
 	mask64 := big.NewInt(1)
@@ -112,7 +135,7 @@ func main() {
 
 	fmt.Fprintf(b, "const pow5NumBits64 = %d\n", pow5NumBits64)
 	fmt.Fprintln(b, "var pow5Split64 = [...]uint128{")
-	for i := int64(0); i < posTableSize64; i++ {
+	for i := int64(0); i < posTableSize64*26; i += 26 {
 		pow5 := big.NewInt(5)
 		pow5.Exp(pow5, big.NewInt(i), nil)
 		shift := pow5.BitLen() - pow5NumBits64
@@ -123,9 +146,18 @@ func main() {
 	}
 	fmt.Fprintln(b, "\n}")
 
+	// Unfortunately, the results are sometimes off by one.
+	// We use an additional lookup table to store those cases and adjust the result.
+	// TODO(caleb): Derive these.
+	fmt.Fprintln(b, "var pow5Offsets64 = [...]uint32{")
+	for _, off := range pow5Offsets {
+		fmt.Fprintf(b, "0x%08x,\n", off)
+	}
+	fmt.Fprintln(b, "\n}\n")
+
 	fmt.Fprintf(b, "const pow5InvNumBits64 = %d\n", pow5InvNumBits64)
 	fmt.Fprintln(b, "var pow5InvSplit64 = [...]uint128{")
-	for i := int64(0); i < negTableSize64; i++ {
+	for i := int64(0); i < negTableSize64*26; i += 26 {
 		pow5 := big.NewInt(5)
 		pow5.Exp(pow5, big.NewInt(i), nil)
 		// We want floor(log_2 5^q) here, which is pow5.BitLen() - 1.
@@ -139,6 +171,12 @@ func main() {
 		fmt.Fprintf(b, "{%d, %d},\n", lo.Uint64(), hi.Uint64())
 	}
 	fmt.Fprintln(b, "\n}")
+
+	fmt.Fprintln(b, "var pow5InvOffsets64 = [...]uint32{")
+	for _, off := range pow5InvOffsets {
+		fmt.Fprintf(b, "0x%08x,\n", off)
+	}
+	fmt.Fprintln(b, "\n}\n")
 
 	text, err := format.Source(b.Bytes())
 	if err != nil {

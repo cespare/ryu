@@ -156,7 +156,7 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 		e10 = int32(q)
 		k := pow5InvNumBits64 + pow5Bits(int32(q)) - 1
 		i := -e2 + int32(q) + k
-		mul := pow5InvSplit64[q]
+		mul := invPow5(q)
 		vr = mulShift64(4*m2, mul, i)
 		vp = mulShift64(4*m2+2, mul, i)
 		vm = mulShift64(4*m2-1-mmShift, mul, i)
@@ -183,7 +183,7 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 		i := -e2 - int32(q)
 		k := pow5Bits(i) - pow5NumBits64
 		j := int32(q) - k
-		mul := pow5Split64[i]
+		mul := pow5(uint32(i))
 		vr = mulShift64(4*m2, mul, j)
 		vp = mulShift64(4*m2+2, mul, j)
 		vm = mulShift64(4*m2-1-mmShift, mul, j)
@@ -312,6 +312,48 @@ var powersOf10 = [...]uint64{
 	1e16,
 	1e17,
 	// We only need to find the length of at most 17 digit numbers.
+}
+
+func pow5(i uint32) uint128 {
+	base := i / uint32(len(pow5Table))
+	base2 := base * uint32(len(pow5Table))
+	offset := i - base2
+	mul := pow5Split64[base]
+	if offset == 0 {
+		return mul
+	}
+	m := pow5Table[offset]
+	hihi, hilo := bits.Mul64(m, mul.hi)
+	lohi, lolo := bits.Mul64(m, mul.lo)
+	sum := lohi + hilo
+	if sum < lohi {
+		hihi++ // overflow
+	}
+	delta := pow5Bits(int32(i)) - pow5Bits(int32(base2))
+	lo := shiftRight128(uint128{lo: lolo, hi: sum}, delta) + uint64((pow5Offsets64[base]>>offset)&1)
+	hi := shiftRight128(uint128{lo: sum, hi: hihi}, delta)
+	return uint128{lo: lo, hi: hi}
+}
+
+func invPow5(i uint32) uint128 {
+	base := (i + uint32(len(pow5Table)) - 1) / uint32(len(pow5Table))
+	base2 := base * uint32(len(pow5Table))
+	offset := base2 - i
+	mul := pow5InvSplit64[base]
+	if offset == 0 {
+		return mul
+	}
+	m := pow5Table[offset]
+	hihi, hilo := bits.Mul64(m, mul.hi)
+	lohi, lolo := bits.Mul64(m, mul.lo)
+	sum := lohi + hilo
+	if sum < lohi {
+		hihi++ // overflow
+	}
+	delta := pow5Bits(int32(base2)) - pow5Bits(int32(i))
+	lo := shiftRight128(uint128{lo: lolo, hi: sum}, delta) + 1 + uint64((pow5InvOffsets64[i/16]>>((i%16)<<1))&3)
+	hi := shiftRight128(uint128{lo: sum, hi: hihi}, delta)
+	return uint128{lo: lo, hi: hi}
 }
 
 func decimalLen64(u uint64) int {

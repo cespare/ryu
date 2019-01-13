@@ -87,8 +87,8 @@ var float64TestCases = []float64{
 	2.2250738585072011e-308,
 
 	// https://github.com/golang/go/issues/29491
-	//498484681984085570,
-	//-5.8339553793802237e+23,
+	498484681984085570,
+	-5.8339553793802237e+23,
 }
 
 func TestFormatFloat64(t *testing.T) {
@@ -102,7 +102,7 @@ func TestFormatFloat64(t *testing.T) {
 }
 
 func TestFormatFloatRandom(t *testing.T) {
-	t.Skip("disabled because of Go bug: https://github.com/golang/go/issues/29491")
+	//t.Skip("disabled because of Go bug: https://github.com/golang/go/issues/29491")
 	for i := 0; i < 1e6; i++ {
 		f := math.Float64frombits(rand.Uint64())
 
