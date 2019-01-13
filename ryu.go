@@ -158,7 +158,7 @@ func pow5Bits(e int32) int32 {
 	return int32((uint32(e)*1217359)>>19 + 1)
 }
 
-// FIXME(caleb): Document how these are optimized.
+// These boolToXxx all inline as a movzx.
 
 func boolToInt(b bool) int {
 	if b {

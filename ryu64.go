@@ -339,7 +339,6 @@ func shiftRight128(v uint128, shift int32) uint64 {
 	// Check this here in case a future change requires larger shift
 	// values. In this case this function needs to be adjusted.
 	assert(shift < 64, "shift < 64")
-	// FIXME: optimize
 	return (v.hi << uint64(64-shift)) | (v.lo >> uint(shift))
 }
 
