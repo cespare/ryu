@@ -18,11 +18,16 @@
 package ryu
 
 import (
+	"bytes"
+	"fmt"
 	"math"
 	"math/big"
 	"math/rand"
+	"sort"
 	"strconv"
 	"testing"
+	"text/tabwriter"
+	"time"
 )
 
 var genericTestCases = []float64{
@@ -111,6 +116,29 @@ func TestFormatFloatRandom(t *testing.T) {
 		want := strconv.FormatFloat(f, 'e', -1, 64)
 		if got != want {
 			t.Fatalf("FormatFloat64(%g): got %q; want %q", f, got, want)
+		}
+	}
+}
+
+func TestDecimalLen(t *testing.T) {
+	for n := uint64(1); n < 1000; n++ {
+		testDecimalLen(t, n)
+	}
+	for i := 0; i < 1e5; i++ {
+		n := uint64(rand.Intn(99999999999999999) + 1)
+		testDecimalLen(t, n)
+	}
+}
+
+func testDecimalLen(t *testing.T, n uint64) {
+	t.Helper()
+	want := len(big.NewInt(int64(n)).String()) // n fits into int64
+	if got := decimalLen64(n); got != want {
+		t.Fatalf("decimalLen64(%d): got %d; want %d", n, got, want)
+	}
+	if n < math.MaxUint32 {
+		if got := decimalLen32(uint32(n)); got != want {
+			t.Fatalf("decimalLen32(%d): got %d; want %d", n, got, want)
 		}
 	}
 }
@@ -221,25 +249,73 @@ func BenchmarkStrconvAppendFloat64(b *testing.B) {
 	}
 }
 
-func TestDecimalLen(t *testing.T) {
-	for n := uint64(1); n < 1000; n++ {
-		testDecimalLen(t, n)
+// This is a test (not benchmark) because it uses a slightly different strategy
+// than normal Go benchmarks.
+func TestRandomBenchmark(t *testing.T) {
+	t.Skip("unskip to run long benchmark test")
+	var ryuDist, stdlibDist dist
+	const n = 50e3
+	stdlibAppend := func(b []byte, f float64) []byte {
+		return strconv.AppendFloat(b, f, 'e', -1, 64)
 	}
-	for i := 0; i < 1e5; i++ {
-		n := uint64(rand.Intn(99999999999999999) + 1)
-		testDecimalLen(t, n)
+	b := make([]byte, 50)
+	for i := 0; i < n; i++ {
+		f := math.Float64frombits(rand.Uint64())
+		ryu := runRandomBenchmark(b, f, AppendFloat64)
+		ryuDist = append(ryuDist, ryu.Nanoseconds())
+		stdlib := runRandomBenchmark(b, f, stdlibAppend)
+		stdlibDist = append(stdlibDist, stdlib.Nanoseconds())
 	}
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 2, ' ', 0)
+	summarize := func(name string, d dist) {
+		min, max, median, mean := d.summarize()
+		fmt.Fprintf(w, "%s\tmin = %dns\tmax = %dns\tmedian = %dns\tmean = %dns\t\n",
+			name, min, max, median, mean)
+	}
+	summarize("ryu:", ryuDist)
+	summarize("strconv (stdlib):", stdlibDist)
+	w.Flush()
+	t.Logf("after sampling %d float64s:\n%s", int64(n), buf.String())
 }
 
-func testDecimalLen(t *testing.T, n uint64) {
-	t.Helper()
-	want := len(big.NewInt(int64(n)).String()) // n fits into int64
-	if got := decimalLen64(n); got != want {
-		t.Fatalf("decimalLen64(%d): got %d; want %d", n, got, want)
+type dist []int64
+
+func (d dist) summarize() (min, max, median, mean int64) {
+	sort.Slice(d, func(i, j int) bool { return d[i] < d[j] })
+	min = d[0]
+	max = d[len(d)-1]
+	median = d[len(d)/2]
+	var sum float64
+	for _, ns := range d {
+		sum += float64(ns)
 	}
-	if n < math.MaxUint32 {
-		if got := decimalLen32(uint32(n)); got != want {
-			t.Fatalf("decimalLen32(%d): got %d; want %d", n, got, want)
+	mean = int64(sum / float64(len(d)))
+	return
+}
+
+func runRandomBenchmark(b []byte, f float64, format func([]byte, float64) []byte) time.Duration {
+	// Estimate the time.
+	d0 := measureCall(b, f, format, 1)
+	times := int(100 * time.Microsecond / d0)
+	if times < 10 {
+		times = 10
+	}
+	var min time.Duration
+	for i := 0; i < 5; i++ {
+		d := measureCall(b, f, format, times)
+		if min == 0 || d < min {
+			min = d
 		}
 	}
+	return min
+}
+
+func measureCall(b []byte, f float64, format func([]byte, float64) []byte, times int) time.Duration {
+	start := time.Now()
+	for i := 0; i < times; i++ {
+		_ = format(b[:0], f)
+	}
+	elapsed := time.Since(start)
+	return elapsed / time.Duration(times)
 }
