@@ -42,7 +42,6 @@ func (d dec32) append(b []byte, neg bool) []byte {
 	}
 
 	// Print the decimal digits.
-	// FIXME: optimize
 	n := len(b)
 	b = append(b, make([]byte, bufLen)...)
 	for i := 0; i < outLen-1; i++ {
