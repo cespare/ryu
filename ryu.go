@@ -15,6 +15,8 @@
 // Ulf Adams which may be found at https://github.com/ulfjack/ryu. That source
 // code is licensed under Apache 2.0 and this code is derivative work thereof.
 
+// Package ryu implements the Ryu algorithm for quickly converting floating
+// point numbers into strings.
 package ryu
 
 import (
