@@ -25,9 +25,6 @@ import (
 
 //go:generate go run maketables.go
 
-// FIXME Optimizations:
-// bits.Div
-
 const (
 	mantBits32 = 23
 	expBits32  = 8

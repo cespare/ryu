@@ -60,7 +60,6 @@ func (d dec64) append(b []byte, neg bool) []byte {
 	// so the rest will fit into a uint32.
 	var i int
 	if out>>32 > 0 {
-		// FIXME: bits.Div?
 		var out32 uint32
 		out, out32 = out/1e8, uint32(out%1e8)
 		for ; i < 8; i++ {
@@ -153,7 +152,6 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 	)
 	if e2 >= 0 {
 		// This expression is slightly faster than max(0, log10Pow2(e2) - 1).
-		// FIXME: Confirm.
 		q := log10Pow2(e2) - boolToUint32(e2 > 3)
 		e10 = int32(q)
 		k := pow5InvNumBits64 + pow5Bits(int32(q)) - 1
@@ -180,7 +178,6 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 		}
 	} else {
 		// This expression is slightly faster than max(0, log10Pow5(-e2) - 1).
-		// FIXME: confirm
 		q := log10Pow5(-e2) - boolToUint32(-e2 > 1)
 		e10 = int32(q) + e2
 		i := -e2 - int32(q)
