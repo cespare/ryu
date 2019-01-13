@@ -265,7 +265,7 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 		// Specialized for the common case (~99.3%).
 		// Percentages below are relative to this.
 		roundUp := false
-		if vp/100 > vm/100 {
+		for vp/100 > vm/100 {
 			// Optimization: remove two digits at a time (~86.2%).
 			roundUp = vr%100 >= 50
 			vr /= 100
