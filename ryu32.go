@@ -240,6 +240,7 @@ func float32ToDecimal(mant, exp uint32) dec32 {
 func decimalLen32(u uint32) int {
 	// Function precondition: u is not a 10-digit number.
 	// (9 digits are sufficient for round-tripping.)
+	// This benchmarked faster than the log2 approach used for uint64s.
 	assert(u < 1000000000, "too big")
 	switch {
 	case u >= 100000000:

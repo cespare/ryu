@@ -292,48 +292,33 @@ func float64ToDecimal(mant, exp uint64) dec64 {
 	return dec64{m: out, e: e10 + removed}
 }
 
+var powersOf10 = [...]uint64{
+	1e0,
+	1e1,
+	1e2,
+	1e3,
+	1e4,
+	1e5,
+	1e6,
+	1e7,
+	1e8,
+	1e9,
+	1e10,
+	1e11,
+	1e12,
+	1e13,
+	1e14,
+	1e15,
+	1e16,
+	1e17,
+	// We only need to find the length of at most 17 digit numbers.
+}
+
 func decimalLen64(u uint64) int {
-	// This is slightly faster than a loop. FIXME: Confirm.
-	// The average output length is 16.38 digits, so we check high-to-low.
-	// Function precondition: v is not an 18, 19, or 20-digit number.
-	// (17 digits are sufficient for round-tripping.)
-	assert(u < 100000000000000000, "too big")
-	switch {
-	case u >= 10000000000000000:
-		return 17
-	case u >= 1000000000000000:
-		return 16
-	case u >= 100000000000000:
-		return 15
-	case u >= 10000000000000:
-		return 14
-	case u >= 1000000000000:
-		return 13
-	case u >= 100000000000:
-		return 12
-	case u >= 10000000000:
-		return 11
-	case u >= 1000000000:
-		return 10
-	case u >= 100000000:
-		return 9
-	case u >= 10000000:
-		return 8
-	case u >= 1000000:
-		return 7
-	case u >= 100000:
-		return 6
-	case u >= 10000:
-		return 5
-	case u >= 1000:
-		return 4
-	case u >= 100:
-		return 3
-	case u >= 10:
-		return 2
-	default:
-		return 1
-	}
+	// http://graphics.stanford.edu/~seander/bithacks.html#IntegerLog10
+	log2 := 64 - bits.LeadingZeros64(u) - 1
+	t := (log2 + 1) * 1233 >> 12
+	return t - boolToInt(u < powersOf10[t]) + 1
 }
 
 func mulShift64(m uint64, mul uint128, shift int32) uint64 {

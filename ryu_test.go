@@ -19,6 +19,7 @@ package ryu
 
 import (
 	"math"
+	"math/big"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -217,5 +218,28 @@ func BenchmarkStrconvAppendFloat64(b *testing.B) {
 			}
 			sinkb = buf
 		})
+	}
+}
+
+func TestDecimalLen(t *testing.T) {
+	for n := uint64(1); n < 1000; n++ {
+		testDecimalLen(t, n)
+	}
+	for i := 0; i < 1e5; i++ {
+		n := uint64(rand.Intn(99999999999999999) + 1)
+		testDecimalLen(t, n)
+	}
+}
+
+func testDecimalLen(t *testing.T, n uint64) {
+	t.Helper()
+	want := len(big.NewInt(int64(n)).String()) // n fits into int64
+	if got := decimalLen64(n); got != want {
+		t.Fatalf("decimalLen64(%d): got %d; want %d", n, got, want)
+	}
+	if n < math.MaxUint32 {
+		if got := decimalLen32(uint32(n)); got != want {
+			t.Fatalf("decimalLen32(%d): got %d; want %d", n, got, want)
+		}
 	}
 }

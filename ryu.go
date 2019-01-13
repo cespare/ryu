@@ -160,6 +160,13 @@ func pow5Bits(e int32) int32 {
 
 // FIXME(caleb): Document how these are optimized.
 
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 func boolToUint32(b bool) uint32 {
 	if b {
 		return 1
