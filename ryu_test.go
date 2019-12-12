@@ -44,6 +44,7 @@ var genericTestCases = []float64{
 	-0.3,
 	1000000,
 	123456.7,
+	10.01,
 	123e45,
 	-123.45,
 	1e23,
@@ -191,8 +192,10 @@ var benchCases = []float64{
 	0,
 	1,
 	0.3,
+	0.0000000003,
 	1000000,
 	-123.45,
+	-123456789.123456789,
 }
 
 func BenchmarkAppendFloat32(b *testing.B) {
@@ -318,4 +321,57 @@ func measureCall(b []byte, f float64, format func([]byte, float64) []byte, times
 	}
 	elapsed := time.Since(start)
 	return elapsed / time.Duration(times)
+}
+
+func appendFloat64fHelper(t *testing.T, num float64) string {
+	// Test both with under sized and over sized buffer since the implementation
+	// differs a bit between the two cases.
+	t.Helper()
+	dst1 := make([]byte, 0, 1000)
+	dst1 = AppendFloat64f(dst1, num)
+
+	dst2 := make([]byte, 0)
+	dst2 = AppendFloat64f(dst2, num)
+
+	sdst1 := string(dst1)
+	sdst2 := string(dst2)
+	if sdst1 != sdst2 {
+		t.Fatalf("%s != %s", sdst1, sdst2)
+	}
+
+	return sdst1
+}
+
+func TestAppendFloat64f(t *testing.T) {
+	for _, f := range append(genericTestCases, float64TestCases...) {
+		got := appendFloat64fHelper(t, f)
+		want := strconv.FormatFloat(f, 'f', -1, 64)
+		if got != want {
+			t.Errorf("FormatFloat64f(%g): got %q; want %q", f, got, want)
+		}
+	}
+}
+
+func BenchmarkStrconvAppendFloat64f(b *testing.B) {
+	for _, f := range append(benchCases, benchCases64...) {
+		b.Run(FormatFloat64(f), func(b *testing.B) {
+			var buf []byte
+			for i := 0; i < b.N; i++ {
+				buf = strconv.AppendFloat(buf[:0], f, 'f', -1, 64)
+			}
+			sinkb = buf
+		})
+	}
+}
+
+func BenchmarkAppendFloat64f(b *testing.B) {
+	for _, f := range append(benchCases, benchCases64...) {
+		b.Run(FormatFloat64(f), func(b *testing.B) {
+			var buf []byte
+			for i := 0; i < b.N; i++ {
+				buf = AppendFloat64f(buf[:0], f)
+			}
+			sinkb = buf
+		})
+	}
 }

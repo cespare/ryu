@@ -102,6 +102,77 @@ func (d dec64) append(b []byte, neg bool) []byte {
 	return b
 }
 
+func sizeSlice(b []byte, bufLen int) []byte {
+	if cap(b)-len(b) >= bufLen {
+		// Avoid function call in the common case.
+		return b[:len(b)+bufLen]
+	}
+
+	return append(b, make([]byte, bufLen)...)
+}
+
+func (d dec64) appendF(b []byte, neg bool) []byte {
+	// Step 5: Print the decimal representation.
+	if neg {
+		b = append(b, '-')
+	}
+
+	out := d.m
+	outLen := decimalLen64(out)
+
+	dE := int(d.e)
+	if dE >= 0 {
+		// XYZ
+		n := len(b)
+		b = sizeSlice(b, dE+outLen)
+		for i := n; i < dE+n; i++ {
+			b[outLen+i] = '0'
+		}
+
+		for i := n + outLen - 1; i >= n; i-- {
+			b[i] = '0' + byte(out%10)
+			out /= 10
+		}
+
+		return b
+	}
+
+	ePos := -dE
+	if ePos >= outLen {
+		// 0.XYZ
+		b := append(b, "0."...)
+		n := len(b)
+		b = sizeSlice(b, ePos)
+		for i := n + ePos - 1; i >= n; i-- {
+			b[i] = '0' + byte(out%10)
+			out /= 10
+		}
+
+		return b
+	}
+
+	// Y.XZ
+	b = sizeSlice(b, outLen+1) // + "."
+	n := len(b)
+	i := n - 1
+	end := i - outLen
+	for ; ePos > 0; i-- {
+		b[i] = '0' + byte(out%10)
+		out /= 10
+		ePos--
+	}
+
+	b[i] = '.'
+	i--
+
+	for ; i >= end; i-- {
+		b[i] = '0' + byte(out%10)
+		out /= 10
+	}
+
+	return b
+}
+
 func float64ToDecimalExactInt(mant, exp uint64) (d dec64, ok bool) {
 	e := exp - bias64
 	if e > mantBits64 {
