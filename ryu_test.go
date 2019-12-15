@@ -323,31 +323,24 @@ func measureCall(b []byte, f float64, format func([]byte, float64) []byte, times
 	return elapsed / time.Duration(times)
 }
 
-func appendFloat64fHelper(t *testing.T, num float64) string {
-	// Test both with under sized and over sized buffer since the implementation
-	// differs a bit between the two cases.
-	t.Helper()
-	dst1 := make([]byte, 0, 1000)
-	dst1 = AppendFloat64f(dst1, num)
-
-	dst2 := make([]byte, 0)
-	dst2 = AppendFloat64f(dst2, num)
-
-	sdst1 := string(dst1)
-	sdst2 := string(dst2)
-	if sdst1 != sdst2 {
-		t.Fatalf("%s != %s", sdst1, sdst2)
+func TestFormatFloat64f(t *testing.T) {
+	for _, f := range append(genericTestCases, float64TestCases...) {
+		got := FormatFloat64f(f)
+		want := strconv.FormatFloat(f, 'f', -1, 64)
+		if got != want {
+			t.Errorf("FormatFloat64f(%g): got %q; want %q", f, got, want)
+		}
 	}
-
-	return sdst1
 }
 
 func TestAppendFloat64f(t *testing.T) {
 	for _, f := range append(genericTestCases, float64TestCases...) {
-		got := appendFloat64fHelper(t, f)
-		want := strconv.FormatFloat(f, 'f', -1, 64)
-		if got != want {
-			t.Errorf("FormatFloat64f(%g): got %q; want %q", f, got, want)
+		// Test with under sized and over sized buffer since the implementation
+		// differs a bit between the two cases.
+		bigBufResult := string(AppendFloat64f(make([]byte, 0, 1000), f))
+		smallBufResult := string(AppendFloat64f(make([]byte, 0), f))
+		if bigBufResult != smallBufResult {
+			t.Errorf("AppendFloat64f(%g): big %q; small %q", f, bigBufResult, smallBufResult)
 		}
 	}
 }

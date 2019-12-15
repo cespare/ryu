@@ -78,13 +78,12 @@ func AppendFloat32(b []byte, f float32) []byte {
 func FormatFloat64(f float64) string {
 	b := make([]byte, 0, 24)
 	b = AppendFloat64(b, f)
+	return byteSliceToString(b)
+}
 
-	// Convert the output to a string without copying.
-	var s string
-	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	sh.Data = uintptr(unsafe.Pointer(&b[0]))
-	sh.Len = len(b)
-	return s
+func byteSliceToString(b []byte) string {
+	// Zero alloc conversion following pattern found in stdlib strings.Builder.
+	return *(*string)(unsafe.Pointer(&b))
 }
 
 // AppendFloat64 appends the string form of the 64-bit floating point number f,
@@ -125,6 +124,14 @@ func appendSpecial(b []byte, neg, expZero, mantZero bool) []byte {
 		b = append(b, '-')
 	}
 	return append(b, "0e+00"...)
+}
+
+// FormatFloat64 converts a 64-bit floating point number f to a string.
+// It behaves like strconv.FormatFloat(f, 'f', -1, 64).
+func FormatFloat64f(f float64) string {
+	b := make([]byte, 0, 24)
+	b = AppendFloat64f(b, f)
+	return byteSliceToString(b)
 }
 
 // AppendFloat64 appends the string form of the 64-bit floating point number f,
